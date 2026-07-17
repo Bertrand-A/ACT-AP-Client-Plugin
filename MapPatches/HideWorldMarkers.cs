@@ -8,14 +8,7 @@ namespace ACTAP
         [HarmonyPostfix]
         public static void Postfix(bool paused)
         {
-            if (Plugin.RenderWorldMarkers)
-            {
-                Plugin.RenderWorldMarkersTemp = !paused;
-            }
-            else
-            {
-                Plugin.RenderWorldMarkersTemp = false;
-            }
+            Plugin.RenderWorldMarkersTemp = !paused;
         }
     }
 }

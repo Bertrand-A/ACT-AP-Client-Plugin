@@ -21,9 +21,10 @@ using UnityEngine.SceneManagement;
 namespace ACTAP
 {
 
-    [BepInPlugin("ACTPlugins.Automagic.Archipelago", "AP Randomizer", "0.5.0")]
+    [BepInPlugin("ACTPlugins.Automagic.Archipelago", "AP Randomizer", PluginVersion)]
     public class Plugin : BaseUnityPlugin
     {
+        public const string PluginVersion = "0.5.1";
         public static Player _player;
         public static LoadingScreen _loadingScreen;
         float alphaAmount = 0f;
@@ -41,6 +42,7 @@ namespace ACTAP
 
         public static bool removePickups = false;
         public static bool debugMode = false;
+        public static bool deathLinkEnabled = false;
         public static float microplasticMult = 1.0f;
 
         public static bool settingsSaved = false;
@@ -61,8 +63,10 @@ namespace ACTAP
         public static List<GameObject> mapMarkers = new();
 
         public static bool RenderWorldMarkers = false;
-        public static bool RenderWorldMarkersTemp = false;
+        public static bool RenderWorldMarkersTemp = true;
         public static bool RenderMapMarkers = false;
+        public static bool hideMarkersOnAggro = true;
+        public static float markerRenderDistance = 300f; // Determines how far we should render the icons, seems useful
 
 
         private void Awake()
@@ -329,6 +333,13 @@ namespace ACTAP
                 {
 
                     slotData = LoginSuccess.SlotData;
+                    // If we aren't on v0.5.0, fail to connect
+                    if (!slotData.ContainsKey("ngplus_bosses") || !slotData.ContainsKey("ngplus_slots"))
+                    {
+                        Debug.Log("Error connecting to Archipelago: Using wrong version. Make sure you generated on v0.5.0 or higher.");
+                        TryDisconnect();
+                        return;
+                    }
 
                     Debug.Log("Successfully connected to Archipelago Multiworld server!");
 
@@ -350,14 +361,7 @@ namespace ACTAP
                     };
 
                     
-                    if ((bool)Plugin.connection.slotData["death_link"])
-                    {
-                        deathLinkService.EnableDeathLink();
-                    }
-                    else
-                    {
-                        deathLinkService.DisableDeathLink();
-                    }
+                    SetDeathLink((bool)slotData["death_link"]);
 
                     //SetupDataStorage();
 
@@ -583,6 +587,24 @@ namespace ACTAP
                 }
             }
 
+            public void SetDeathLink(bool enabled)
+            {
+                Plugin.deathLinkEnabled = enabled;
+                if (deathLinkService == null)
+                {
+                    return;
+                }
+                if (enabled)
+                {
+                    deathLinkService.EnableDeathLink();
+                }
+                else
+                {
+                    deathLinkService.DisableDeathLink();
+                }
+                Debug.Log("Death Link " + (enabled ? "enabled" : "disabled"));
+            }
+
             public void SendDeathLink(string deathCause)
             {
                 if (connected)
@@ -623,19 +645,19 @@ namespace ACTAP
                 }
 
                 windowRect = new Rect(0, 0, windowWidth, 150);
-                windowRect = GUI.Window(0, windowRect, APConnectMenu, "Archipelago");
+                windowRect = GUI.Window(0, windowRect, APConnectMenu, $"Archipelago (Plugin v{PluginVersion})");
             }
             else if (showMenu && debugMode && _player != null)
             {
                 GUI.backgroundColor = backgroundColor;
-                windowRect = new Rect(0, 0, 200, 250);
-                windowRect = GUI.Window(0, windowRect, DebugMenu, "Debug");
+                windowRect = new Rect(0, 0, 200, 310);
+                windowRect = GUI.Window(0, windowRect, DebugMenu, $"Debug (Plugin v{PluginVersion}");
             }
             else if (showMenu && !debugMode && connection.session != null && _player != null)
             {
                 GUI.backgroundColor = backgroundColor;
-                windowRect = new Rect(0, 0, 200, 220);
-                windowRect = GUI.Window(0, windowRect, APClientMenu, "Archipelago");
+                windowRect = new Rect(0, 0, 200, 300);
+                windowRect = GUI.Window(0, windowRect, APClientMenu, $"Archipelago (Plugin v{PluginVersion})");
             }
         }
 
@@ -655,7 +677,17 @@ namespace ACTAP
 
             RenderMapMarkers = GUILayout.Toggle(RenderMapMarkers, "Show items on map");
             RenderWorldMarkers = GUILayout.Toggle(RenderWorldMarkers, "Show items in world");
-            
+
+            GUILayout.Label("Item marker distance: " + Mathf.RoundToInt(markerRenderDistance));
+            markerRenderDistance = GUILayout.HorizontalSlider(markerRenderDistance, 100f, 1000f);
+
+            hideMarkersOnAggro = GUILayout.Toggle(hideMarkersOnAggro, "Hide items in combat");
+
+            bool newDeathLink = GUILayout.Toggle(deathLinkEnabled, "Death Link");
+            if (newDeathLink != deathLinkEnabled)
+            {
+                connection.SetDeathLink(newDeathLink);
+            }
 
             if (CrabFile.current.inventoryData.HasItem("Shallows_0_ForkOverlook"))
             {
@@ -773,6 +805,11 @@ namespace ACTAP
 
                 RenderMapMarkers = GUILayout.Toggle(RenderMapMarkers, "Show items on map");
                 RenderWorldMarkers = GUILayout.Toggle(RenderWorldMarkers, "Show items in world");
+
+                GUILayout.Label("Marker distance: " + Mathf.RoundToInt(markerRenderDistance));
+                markerRenderDistance = GUILayout.HorizontalSlider(markerRenderDistance, 20f, 300f);
+
+                hideMarkersOnAggro = GUILayout.Toggle(hideMarkersOnAggro, "Hide markers in combat");
 
                 if (GUILayout.Button("Give Useful Items"))
                 {
@@ -905,9 +942,9 @@ namespace ACTAP
 
         public static void RenderWorld()
         {
-            if (RenderWorldMarkersTemp)
+            if (RenderWorldMarkersTemp && _player != null && (!hideMarkersOnAggro || !EnemiesAggro()))
             {
-                Debug.Log("Render World");
+                Vector3 playerCenter = _player.GetCenter();
                 if (crystalEnemies != null)
                 {
                     foreach (Enemy enemy in crystalEnemies)
@@ -921,6 +958,10 @@ namespace ACTAP
                         if (enemy.umamiDrops > 0)
                         {
                             Vector3 center = enemy.GetCenter();
+                            if (Vector3.Distance(center, playerCenter) > markerRenderDistance)
+                            {
+                                continue;
+                            }
                             Vector3 screenPoint = Camera.main.WorldToScreenPoint(center);
                             Texture2D crystal = ModHelper.GetSprite("crystal").texture;
                             float iconSize = 64;
@@ -968,6 +1009,10 @@ namespace ACTAP
                             continue;
                         }
                         Vector3 center = item.GetCenter();
+                        if (Vector3.Distance(center, playerCenter) > markerRenderDistance)
+                        {
+                            continue;
+                        }
                         Vector3 screenPoint = Camera.main.WorldToScreenPoint(center);
                         Texture2D crystal = ModHelper.GetSprite(resourceName).texture;
                         float iconSize = 64;
@@ -983,15 +1028,24 @@ namespace ACTAP
 
         public static bool EnemiesAggro()
         {
-            bool aggro = false;
+            if (_player == null)
+            {
+                return false;
+            }
             foreach (Enemy enemy in crystalEnemies)
             {
-                if (enemy.aggro)
+                // Bobbit worms in specific should not adjust this
+                if (enemy == null || enemy.dead || enemy is BobbitWorm)
                 {
-                    aggro = true;
+                    continue;
+                }
+                // only count enemies close enough to actually be in combat
+                if (enemy.aggro && Vector3.Distance(enemy.GetCenter(), _player.GetCenter()) < 60f)
+                {
+                    return true;
                 }
             }
-            return aggro;
+            return false;
         }
     }
 }
