@@ -39,6 +39,12 @@ namespace ACTAP
                 return;
             }
 
+            //The Perfect Whorl ends the game and must never be replaced
+            if (__instance is PerfectWhorl)
+            {
+                return;
+            }
+
             if (!__instance.name.Contains("SWAP") && __instance.gameObject.scene.name != "Player_Main" && !__instance.name.Contains("HomeShell") && !__instance.name.Contains("PerfectWhorl"))
             {
                 if (__instance.transform.parent != null)
@@ -69,8 +75,15 @@ namespace ACTAP
                 {
                     Dictionary<string, string> shellRandoData = JsonConvert.DeserializeObject<Dictionary<string, string>>(CrabFile.current.GetString("shellRando"));
                     //Debug.Log("Replace" + __instance.prefabName);
+                    
+                    string apworldName;
+                    if (!ShellData.shellTableByPrefab.TryGetValue(__instance.prefabName, out apworldName) || apworldName == "" || !shellRandoData.ContainsKey(apworldName))
+                    {
+                        Debug.Log("Shell " + __instance.prefabName + " is not part of the rando, skipping");
+                        return;
+                    }
 
-                    string newShellName = ShellData.GetShellPrefabName(shellRandoData[ShellData.GetShellApworldName(__instance.prefabName)]);
+                    string newShellName = ShellData.GetShellPrefabName(shellRandoData[apworldName]);
 
                     //Debug.Log(__instance.prefabName + " : " + newShellName);
 

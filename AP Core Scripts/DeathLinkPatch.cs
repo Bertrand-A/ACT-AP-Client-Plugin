@@ -129,7 +129,7 @@ namespace ACTAP
         [HarmonyPrefix]
         static void PlayerDiedPrefix()
         {
-            if (!DeathLinkPatch.isDeathLink && Plugin.connection.session!=null && (bool)Plugin.connection.slotData["death_link"])
+            if (!DeathLinkPatch.isDeathLink && Plugin.connection.session!=null && Plugin.deathLinkEnabled)
             {
                 Plugin.connection.SendDeathLink(DeathLinkPatch.deathMsgSent);
             }
