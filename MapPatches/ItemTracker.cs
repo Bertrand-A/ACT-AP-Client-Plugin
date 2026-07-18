@@ -29,6 +29,10 @@ namespace ACTAP
 
                 foreach (Item item in items)
                 {
+                    if (item == null)
+                    {
+                        continue;
+                    }
                     string itemName = item.DisplayName.Replace("Item_", "").Replace("_Name", "").ToLower();
                     string resourceName;
                     if (ItemNameToResource.ItemToResource.ContainsKey(itemName))
@@ -59,6 +63,10 @@ namespace ACTAP
                         continue;
                     }
                     if (item == null || state.killedPreviously)
+                    {
+                        continue;
+                    }
+                    if (Plugin.ItemLocationAlreadySent(item))
                     {
                         continue;
                     }

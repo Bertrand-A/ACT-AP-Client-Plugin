@@ -68,8 +68,10 @@ namespace ACTAP
         [HarmonyPostfix]
         static void Postfix()
         {
-            Plugin.items.Clear();
-            Plugin.crystalEnemies.Clear();
+            // Remove these on loading screens to fix the world icons.
+            Plugin.items.RemoveAll(item => item == null);
+            Plugin.crystalEnemies.RemoveAll(enemy => enemy == null);
+            Plugin.pickupApidCache.Clear();
         }
     }
 

@@ -14,11 +14,6 @@ namespace ACTAP
                 Object.Destroy(marker);
             }
             Plugin.mapMarkers.Clear();
-
-            if (Plugin.RenderMapMarkers)
-            {
-                Plugin.RenderWorldMarkersTemp = true;
-            }
         }
     }
 }

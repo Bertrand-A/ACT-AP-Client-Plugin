@@ -30,9 +30,10 @@ namespace ACTAP
 
                 foreach (Enemy enemy in enemies)
                 {
+                    if (enemy == null) { continue; }
                     SaveStateKillableEntity state = Traverse.Create(enemy).Field("saveState").GetValue() as SaveStateKillableEntity;
                     if (state == null) { continue; }
-                    if (enemy.transform == null || enemy.isBoss || state.killedPreviously)
+                    if (enemy.isBoss || state.killedPreviously)
                     {
                         continue;
                     }
