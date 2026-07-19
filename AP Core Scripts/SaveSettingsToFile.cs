@@ -18,6 +18,7 @@ namespace ACTAP
         {
             Plugin.RenderMapMarkers = CrabFile.current.GetBool("showMapMarkers");
             Plugin.RenderWorldMarkers = CrabFile.current.GetBool("showWorldMarkers");
+            Plugin.RenderCrystalMarkers = CrabFile.current.GetBool("showCrystalMarkers");
             Plugin.hideMarkersOnAggro = CrabFile.current.GetBool("hideItemsInCombat");
             Plugin.markerRenderDistance = CrabFile.current.GetInt("markerRenderDistance") > 0
                 ? CrabFile.current.GetInt("markerRenderDistance") : 300f;

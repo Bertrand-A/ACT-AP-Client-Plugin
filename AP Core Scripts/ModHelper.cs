@@ -18,38 +18,34 @@ namespace ACTAP
 
         public static Sprite GetSprite(string fileName)
         {
+            if (Sprites.TryGetValue(fileName, out Sprite cached))
+            {
+                return cached;
+            }
+
             Assembly mod = GetAssembly();
-            var embededRes = mod.GetManifestResourceNames();
+            byte[] resource = null;
+            foreach (string e in mod.GetManifestResourceNames())
+            {
+                string[] resourcePath = e.Split('.');
+                string resourceName = resourcePath[2];
 
-            if (Sprites.ContainsKey(fileName))
-            {
-                return Sprites[fileName];
+                if (resourceName == fileName)
+                {
+                    resource = mod.GetManifestResourceStream(e).GetByteArray();
+                    break;
+                }
             }
-            else
+
+            Sprite sprite = null;
+            if (resource != null)
             {
-                byte[] resource = null;
                 Texture2D texture = new(2, 2) { filterMode = FilterMode.Bilinear };
-                foreach (string e in embededRes)
-                {
-                    string[] resourcePath = e.Split('.');
-                    string resourceName = resourcePath[2];
-
-                    if (resourceName == fileName)
-                    {
-                        resource = mod.GetManifestResourceStream(e).GetByteArray();
-                        break;
-                    }
-                }
-                if (resource != null)
-                {
-                    ImageConversion.LoadImage(texture, resource);
-                    Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f), 10.8f);
-                    Sprites[fileName] = sprite;
-                    return sprite;
-                }
+                ImageConversion.LoadImage(texture, resource);
+                sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f), 10.8f);
             }
-            
-            return null;
+            Sprites[fileName] = sprite;
+            return sprite;
         }
         /*
         public static void Msg(string msg)

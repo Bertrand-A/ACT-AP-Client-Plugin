@@ -72,6 +72,7 @@ namespace ACTAP
 
         public static bool RenderWorldMarkers = false;
         public static bool RenderMapMarkers = false;
+        public static bool RenderCrystalMarkers = true;
         public static bool hideMarkersOnAggro = true;
         public static float markerRenderDistance = 300f; // Determines how far we should render the icons, seems useful
 
@@ -673,13 +674,13 @@ namespace ACTAP
             else if (showMenu && debugMode && _player != null)
             {
                 GUI.backgroundColor = backgroundColor;
-                windowRect = new Rect(0, 0, 200, 310);
+                windowRect = new Rect(0, 0, 200, 335);
                 windowRect = GUI.Window(0, windowRect, DebugMenu, $"Debug (Plugin v{PluginVersion}");
             }
             else if (showMenu && !debugMode && connection.session != null && _player != null)
             {
                 GUI.backgroundColor = backgroundColor;
-                windowRect = new Rect(0, 0, 200, 300);
+                windowRect = new Rect(0, 0, 200, 325);
                 windowRect = GUI.Window(0, windowRect, APClientMenu, $"Archipelago (Plugin v{PluginVersion})");
             }
         }
@@ -700,16 +701,19 @@ namespace ACTAP
 
             RenderMapMarkers = GUILayout.Toggle(RenderMapMarkers, "Show items on map");
             RenderWorldMarkers = GUILayout.Toggle(RenderWorldMarkers, "Show items in world");
+            RenderCrystalMarkers = GUILayout.Toggle(RenderCrystalMarkers, "Show crystals on tracker");
 
             GUILayout.Label("Item marker distance: " + (markerRenderDistance != 1000f ? Mathf.RoundToInt(markerRenderDistance) : "N/A"));
             markerRenderDistance = GUILayout.HorizontalSlider(markerRenderDistance, 100f, 1000f);
 
             hideMarkersOnAggro = GUILayout.Toggle(hideMarkersOnAggro, "Hide items in combat");
-            
+
             if (CrabFile.current.GetBool("showMapMarkers") != RenderMapMarkers)
                 CrabFile.current.SetBool("showMapMarkers", RenderMapMarkers);
             if (CrabFile.current.GetBool("showWorldMarkers") != RenderWorldMarkers)
                 CrabFile.current.SetBool("showWorldMarkers", RenderWorldMarkers);
+            if (CrabFile.current.GetBool("showCrystalMarkers") != RenderCrystalMarkers)
+                CrabFile.current.SetBool("showCrystalMarkers", RenderCrystalMarkers);
             if (CrabFile.current.GetBool("hideItemsInCombat") != hideMarkersOnAggro)
                 CrabFile.current.SetBool("hideItemsInCombat", hideMarkersOnAggro);
             if (CrabFile.current.GetInt("markerRenderDistance") != Mathf.RoundToInt(markerRenderDistance))
@@ -845,16 +849,19 @@ namespace ACTAP
 
                 RenderMapMarkers = GUILayout.Toggle(RenderMapMarkers, "Show items on map");
                 RenderWorldMarkers = GUILayout.Toggle(RenderWorldMarkers, "Show items in world");
+                RenderCrystalMarkers = GUILayout.Toggle(RenderCrystalMarkers, "Show crystals on tracker");
 
                 GUILayout.Label("Marker distance: " + Mathf.RoundToInt(markerRenderDistance));
                 markerRenderDistance = GUILayout.HorizontalSlider(markerRenderDistance, 100f, 1000f);
 
                 hideMarkersOnAggro = GUILayout.Toggle(hideMarkersOnAggro, "Hide markers in combat");
-                
+
                 if (CrabFile.current.GetBool("showMapMarkers") != RenderMapMarkers)
                     CrabFile.current.SetBool("showMapMarkers", RenderMapMarkers);
                 if (CrabFile.current.GetBool("showWorldMarkers") != RenderWorldMarkers)
                     CrabFile.current.SetBool("showWorldMarkers", RenderWorldMarkers);
+                if (CrabFile.current.GetBool("showCrystalMarkers") != RenderCrystalMarkers)
+                    CrabFile.current.SetBool("showCrystalMarkers", RenderCrystalMarkers);
                 if (CrabFile.current.GetBool("hideItemsInCombat") != hideMarkersOnAggro)
                     CrabFile.current.SetBool("hideItemsInCombat", hideMarkersOnAggro);
                 if (CrabFile.current.GetInt("markerRenderDistance") != Mathf.RoundToInt(markerRenderDistance))
@@ -1108,7 +1115,7 @@ namespace ACTAP
             Sprite crystalSprite = ModHelper.GetSprite("crystal");
             crystalIcon = crystalSprite != null ? crystalSprite.texture : null;
 
-            if (crystalEnemies != null)
+            if (crystalEnemies != null && RenderCrystalMarkers)
             {
                 foreach (Enemy enemy in crystalEnemies)
                 {
