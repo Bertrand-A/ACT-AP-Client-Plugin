@@ -9,7 +9,22 @@ using UnityEngine;
 
 namespace ACTAP
 {
-    
+    // Just loads once at the start.
+    [HarmonyPatch(typeof(Player), "Start")]
+    class LoadSavedSettings
+    {
+        [HarmonyPostfix]
+        static void Postfix()
+        {
+            Plugin.RenderMapMarkers = CrabFile.current.GetBool("showMapMarkers");
+            Plugin.RenderWorldMarkers = CrabFile.current.GetBool("showWorldMarkers");
+            Plugin.RenderCrystalMarkers = CrabFile.current.GetBool("showCrystalMarkers");
+            Plugin.hideMarkersOnAggro = CrabFile.current.GetBool("hideItemsInCombat");
+            Plugin.markerRenderDistance = CrabFile.current.GetInt("markerRenderDistance") > 0
+                ? CrabFile.current.GetInt("markerRenderDistance") : 300f;
+        }
+    }
+
     [HarmonyPatch(typeof(Player),"Update")]
     class SaveSettingsToFile
     {

@@ -12,8 +12,8 @@ namespace ACTAP
         [HarmonyPostfix]
         public static void Postfix(AreaMap __instance)
         {
-            if (Plugin.RenderMapMarkers)
-            { 
+            if (Plugin.RenderMapMarkers && Plugin.RenderCrystalMarkers)
+            {
                 GameObject icon = __instance.pagurusIcon.gameObject;
                 GameObject mapOverlay = __instance.pagurusIcon.transform.parent.gameObject;
                 List<Enemy> enemies = Plugin.crystalEnemies;
@@ -30,9 +30,10 @@ namespace ACTAP
 
                 foreach (Enemy enemy in enemies)
                 {
+                    if (enemy == null) { continue; }
                     SaveStateKillableEntity state = Traverse.Create(enemy).Field("saveState").GetValue() as SaveStateKillableEntity;
                     if (state == null) { continue; }
-                    if (enemy.transform == null || enemy.isBoss || state.killedPreviously)
+                    if (enemy.isBoss || state.killedPreviously)
                     {
                         continue;
                     }

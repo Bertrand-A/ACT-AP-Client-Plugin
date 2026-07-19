@@ -5,6 +5,7 @@ using Archipelago.MultiClient.Net.Enums;
 using Archipelago.MultiClient.Net.Models;
 using Archipelago.MultiClient.Net.Packets;
 using BepInEx;
+using BepInEx.Configuration;
 using HarmonyLib;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -24,7 +25,7 @@ namespace ACTAP
     [BepInPlugin("ACTPlugins.Automagic.Archipelago", "AP Randomizer", PluginVersion)]
     public class Plugin : BaseUnityPlugin
     {
-        public const string PluginVersion = "0.5.1";
+        public const string PluginVersion = "0.5.2";
         public static Player _player;
         public static LoadingScreen _loadingScreen;
         float alphaAmount = 0f;
@@ -61,16 +62,35 @@ namespace ACTAP
         public static List<Enemy> crystalEnemies = new List<Enemy>();
         public static List<Item> items = new List<Item>();
         public static List<GameObject> mapMarkers = new();
+        public static Dictionary<Item, long> pickupApidCache = new();
+
+        //World marker cache to save performance
+        static readonly List<Enemy> crystalMarkerCache = new();
+        static readonly List<(Item item, Texture2D icon)> itemMarkerCache = new();
+        static Texture2D crystalIcon;
+        static float nextMarkerCacheRefresh = 0f;
 
         public static bool RenderWorldMarkers = false;
-        public static bool RenderWorldMarkersTemp = true;
         public static bool RenderMapMarkers = false;
+        public static bool RenderCrystalMarkers = true;
         public static bool hideMarkersOnAggro = true;
         public static float markerRenderDistance = 300f; // Determines how far we should render the icons, seems useful
+
+        //Last used connection info (BepInEx/config/ACTPlugins.Automagic.Archipelago.cfg)
+        public static ConfigEntry<string> configAddress;
+        public static ConfigEntry<string> configPort;
+        public static ConfigEntry<string> configSlot;
 
 
         private void Awake()
         {
+            configAddress = Config.Bind("Archipelago", "Address", "archipelago.gg", "Last used server address.");
+            configPort = Config.Bind("Archipelago", "Port", "", "Last used server port.");
+            configSlot = Config.Bind("Archipelago", "Slot", "", "Last used slot name.");
+            apAdress = configAddress.Value;
+            apPort = configPort.Value;
+            apSlot = configSlot.Value;
+
             //Generate Data Tables
             LocationDataTable.GenerateTable();
             ShellData.GenerateTable();
@@ -342,6 +362,10 @@ namespace ACTAP
                     }
 
                     Debug.Log("Successfully connected to Archipelago Multiworld server!");
+
+                    configAddress.Value = adress;
+                    configPort.Value = port.ToString();
+                    configSlot.Value = player;
 
                     deathLinkService = session.CreateDeathLinkService();
 
@@ -650,13 +674,13 @@ namespace ACTAP
             else if (showMenu && debugMode && _player != null)
             {
                 GUI.backgroundColor = backgroundColor;
-                windowRect = new Rect(0, 0, 200, 310);
+                windowRect = new Rect(0, 0, 200, 335);
                 windowRect = GUI.Window(0, windowRect, DebugMenu, $"Debug (Plugin v{PluginVersion}");
             }
             else if (showMenu && !debugMode && connection.session != null && _player != null)
             {
                 GUI.backgroundColor = backgroundColor;
-                windowRect = new Rect(0, 0, 200, 300);
+                windowRect = new Rect(0, 0, 200, 325);
                 windowRect = GUI.Window(0, windowRect, APClientMenu, $"Archipelago (Plugin v{PluginVersion})");
             }
         }
@@ -677,11 +701,23 @@ namespace ACTAP
 
             RenderMapMarkers = GUILayout.Toggle(RenderMapMarkers, "Show items on map");
             RenderWorldMarkers = GUILayout.Toggle(RenderWorldMarkers, "Show items in world");
+            RenderCrystalMarkers = GUILayout.Toggle(RenderCrystalMarkers, "Show crystals on tracker");
 
-            GUILayout.Label("Item marker distance: " + Mathf.RoundToInt(markerRenderDistance));
+            GUILayout.Label("Item marker distance: " + (markerRenderDistance != 1000f ? Mathf.RoundToInt(markerRenderDistance) : "N/A"));
             markerRenderDistance = GUILayout.HorizontalSlider(markerRenderDistance, 100f, 1000f);
 
             hideMarkersOnAggro = GUILayout.Toggle(hideMarkersOnAggro, "Hide items in combat");
+
+            if (CrabFile.current.GetBool("showMapMarkers") != RenderMapMarkers)
+                CrabFile.current.SetBool("showMapMarkers", RenderMapMarkers);
+            if (CrabFile.current.GetBool("showWorldMarkers") != RenderWorldMarkers)
+                CrabFile.current.SetBool("showWorldMarkers", RenderWorldMarkers);
+            if (CrabFile.current.GetBool("showCrystalMarkers") != RenderCrystalMarkers)
+                CrabFile.current.SetBool("showCrystalMarkers", RenderCrystalMarkers);
+            if (CrabFile.current.GetBool("hideItemsInCombat") != hideMarkersOnAggro)
+                CrabFile.current.SetBool("hideItemsInCombat", hideMarkersOnAggro);
+            if (CrabFile.current.GetInt("markerRenderDistance") != Mathf.RoundToInt(markerRenderDistance))
+                CrabFile.current.SetInt("markerRenderDistance", Mathf.RoundToInt(markerRenderDistance));
 
             bool newDeathLink = GUILayout.Toggle(deathLinkEnabled, "Death Link");
             if (newDeathLink != deathLinkEnabled)
@@ -767,8 +803,16 @@ namespace ACTAP
                 {
                     if (GUILayout.Button("Connect"))
                     {
-                        Debug.Log("Button");
+                        Debug.Log("Connect Button");
                         connection.TryConnect(apAdress, Int32.Parse(apPort), apPassword, apSlot);
+                    }
+                }
+                else
+                {
+                    if (GUILayout.Button("Disconnect"))
+                    {
+                        Debug.Log("Disconnect Button");
+                        connection.TryDisconnect();
                     }
                 }
 
@@ -805,11 +849,23 @@ namespace ACTAP
 
                 RenderMapMarkers = GUILayout.Toggle(RenderMapMarkers, "Show items on map");
                 RenderWorldMarkers = GUILayout.Toggle(RenderWorldMarkers, "Show items in world");
+                RenderCrystalMarkers = GUILayout.Toggle(RenderCrystalMarkers, "Show crystals on tracker");
 
                 GUILayout.Label("Marker distance: " + Mathf.RoundToInt(markerRenderDistance));
-                markerRenderDistance = GUILayout.HorizontalSlider(markerRenderDistance, 20f, 300f);
+                markerRenderDistance = GUILayout.HorizontalSlider(markerRenderDistance, 100f, 1000f);
 
                 hideMarkersOnAggro = GUILayout.Toggle(hideMarkersOnAggro, "Hide markers in combat");
+
+                if (CrabFile.current.GetBool("showMapMarkers") != RenderMapMarkers)
+                    CrabFile.current.SetBool("showMapMarkers", RenderMapMarkers);
+                if (CrabFile.current.GetBool("showWorldMarkers") != RenderWorldMarkers)
+                    CrabFile.current.SetBool("showWorldMarkers", RenderWorldMarkers);
+                if (CrabFile.current.GetBool("showCrystalMarkers") != RenderCrystalMarkers)
+                    CrabFile.current.SetBool("showCrystalMarkers", RenderCrystalMarkers);
+                if (CrabFile.current.GetBool("hideItemsInCombat") != hideMarkersOnAggro)
+                    CrabFile.current.SetBool("hideItemsInCombat", hideMarkersOnAggro);
+                if (CrabFile.current.GetInt("markerRenderDistance") != Mathf.RoundToInt(markerRenderDistance))
+                    CrabFile.current.SetInt("markerRenderDistance", Mathf.RoundToInt(markerRenderDistance));
 
                 if (GUILayout.Button("Give Useful Items"))
                 {
@@ -940,88 +996,186 @@ namespace ACTAP
             return prefab;
         }
 
+        public static bool ItemLocationAlreadySent(Item item)
+        {
+            if (!pickupApidCache.TryGetValue(item, out long apid))
+            {
+                // These two pickups aren't in the pickup table, matching ItemHandler
+                if (item.name == "ForkUnlock (1)")
+                {
+                    apid = 483021700;
+                }
+                else if (item.name == "FishingLineUnlock")
+                {
+                    apid = 483021702;
+                }
+                else
+                {
+                    apid = LocationDataTable.FindPickupAPID(item);
+                }
+                pickupApidCache[item] = apid;
+            }
+
+            // No AP location mapped to this pickup, keep showing it
+            if (apid < 483021700)
+            {
+                return false;
+            }
+
+            if (CrabFile.current.GetInt("LocationChecked-" + apid) == 1)
+            {
+                return true;
+            }
+
+            // Also covers checks sent for this slot from other clients or before this save
+            ArchipelagoSession session = connection != null ? connection.session : null;
+            return session != null && session.Socket.Connected && session.Locations.AllLocationsChecked.Contains(apid);
+        }
+
         public static void RenderWorld()
         {
-            if (RenderWorldMarkersTemp && _player != null && (!hideMarkersOnAggro || !EnemiesAggro()))
+            if (Event.current.type != EventType.Repaint)
             {
-                Vector3 playerCenter = _player.GetCenter();
-                if (crystalEnemies != null)
-                {
-                    foreach (Enemy enemy in crystalEnemies)
-                    {
-                        SaveStateKillableEntity state = Traverse.Create(enemy).Field("saveState").GetValue() as SaveStateKillableEntity;
-                        if (state == null) { continue; }
-                        if (enemy.transform == null || enemy.isBoss || state.killedPreviously)
-                        {
-                            continue;
-                        }
-                        if (enemy.umamiDrops > 0)
-                        {
-                            Vector3 center = enemy.GetCenter();
-                            if (Vector3.Distance(center, playerCenter) > markerRenderDistance)
-                            {
-                                continue;
-                            }
-                            Vector3 screenPoint = Camera.main.WorldToScreenPoint(center);
-                            Texture2D crystal = ModHelper.GetSprite("crystal").texture;
-                            float iconSize = 64;
+                return;
+            }
+            if (GameManager.instance == null || GameManager.instance.IsPaused())
+            {
+                return;
+            }
+            // Always hide during boss fights, regardless of the toggle, cause it just makes sense to do so
+            if (Boss.IsBossActive())
+            {
+                return;
+            }
+            if (_player == null || (hideMarkersOnAggro && EnemiesAggro()))
+            {
+                return;
+            }
+            
+            if (Time.unscaledTime >= nextMarkerCacheRefresh)
+            {
+                nextMarkerCacheRefresh = Time.unscaledTime + 0.5f;
+                RefreshWorldMarkerCache();
+            }
 
-                            if (screenPoint.z > 0)
-                            {
-                                GUI.DrawTexture(new Rect(new Vector2(screenPoint.x - iconSize / 2, Screen.height - screenPoint.y - iconSize / 2), new Vector2(iconSize, iconSize)), crystal, ScaleMode.ScaleToFit);
-                            }
-                        }
+            // Camera.main does a scene search every call on this Unity version
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                return;
+            }
+            Vector3 playerCenter = _player.GetCenter();
+            float iconSize = 64;
+
+            if (crystalIcon != null)
+            {
+                foreach (Enemy enemy in crystalMarkerCache)
+                {
+                    if (enemy == null || enemy.dead)
+                    {
+                        continue;
+                    }
+                    Vector3 center = enemy.GetCenter();
+                    // If marker render distance is 1000f, just don't bother with the render distance
+                    if (Vector3.Distance(center, playerCenter) > markerRenderDistance && markerRenderDistance != 1000f)
+                    {
+                        continue;
+                    }
+                    Vector3 screenPoint = cam.WorldToScreenPoint(center);
+                    if (screenPoint.z > 0)
+                    {
+                        GUI.DrawTexture(new Rect(new Vector2(screenPoint.x - iconSize / 2, Screen.height - screenPoint.y - iconSize / 2), new Vector2(iconSize, iconSize)), crystalIcon, ScaleMode.ScaleToFit);
                     }
                 }
-                if (items != null)
+            }
+            foreach ((Item item, Texture2D icon) in itemMarkerCache)
+            {
+                if (item == null || icon == null)
                 {
-                    foreach (Item item in items)
-                    {
-                        string itemName = item.DisplayName.Replace("Item_", "").Replace("_Name", "").ToLower();
-                        string resourceName;
-                        if (ItemNameToResource.ItemToResource.ContainsKey(itemName))
-                        {
-                            resourceName = ItemNameToResource.ItemToResource[itemName];
-                        }
-                        else if (itemName.Contains("stowaway"))
-                        {
-                            resourceName = "stowaways";
-                        }
-                        else if (itemName.Contains("claw"))
-                        {
-                            resourceName = "junk";
-                        }
-                        else if (itemName.Contains("costume"))
-                        {
-                            resourceName = "costume";
-                        }
-                        else
-                        {
-                            resourceName = "junk";
-                        }
-                        SaveStateKillableEntity state = Traverse.Create(item).Field("save").GetValue() as SaveStateKillableEntity;
-                        if (state == null)
-                        {
-                            continue;
-                        }
-                        if (item == null || state.killedPreviously)
-                        {
-                            continue;
-                        }
-                        Vector3 center = item.GetCenter();
-                        if (Vector3.Distance(center, playerCenter) > markerRenderDistance)
-                        {
-                            continue;
-                        }
-                        Vector3 screenPoint = Camera.main.WorldToScreenPoint(center);
-                        Texture2D crystal = ModHelper.GetSprite(resourceName).texture;
-                        float iconSize = 64;
+                    continue;
+                }
+                Vector3 center = item.GetCenter();
+                if (Vector3.Distance(center, playerCenter) > markerRenderDistance && markerRenderDistance != 1000f)
+                {
+                    continue;
+                }
+                Vector3 screenPoint = cam.WorldToScreenPoint(center);
+                if (screenPoint.z > 0)
+                {
+                    GUI.DrawTexture(new Rect(new Vector2(screenPoint.x - iconSize / 2, Screen.height - screenPoint.y - iconSize / 2), new Vector2(iconSize, iconSize)), icon, ScaleMode.ScaleToFit);
+                }
+            }
+        }
 
-                        if (screenPoint.z > 0)
-                        {
-                            GUI.DrawTexture(new Rect(new Vector2(screenPoint.x - iconSize / 2, Screen.height - screenPoint.y - iconSize / 2), new Vector2(iconSize, iconSize)), crystal, ScaleMode.ScaleToFit);
-                        }
+        static void RefreshWorldMarkerCache()
+        {
+            crystalMarkerCache.Clear();
+            itemMarkerCache.Clear();
+
+            Sprite crystalSprite = ModHelper.GetSprite("crystal");
+            crystalIcon = crystalSprite != null ? crystalSprite.texture : null;
+
+            if (crystalEnemies != null && RenderCrystalMarkers)
+            {
+                foreach (Enemy enemy in crystalEnemies)
+                {
+                    if (enemy == null || enemy.isBoss || enemy.umamiDrops <= 0)
+                    {
+                        continue;
                     }
+                    SaveStateKillableEntity state = Traverse.Create(enemy).Field("saveState").GetValue() as SaveStateKillableEntity;
+                    if (state == null || state.killedPreviously)
+                    {
+                        continue;
+                    }
+                    crystalMarkerCache.Add(enemy);
+                }
+            }
+            if (items != null)
+            {
+                foreach (Item item in items)
+                {
+                    if (item == null)
+                    {
+                        continue;
+                    }
+                    SaveStateKillableEntity state = Traverse.Create(item).Field("save").GetValue() as SaveStateKillableEntity;
+                    if (state == null || state.killedPreviously)
+                    {
+                        continue;
+                    }
+                    if (ItemLocationAlreadySent(item))
+                    {
+                        continue;
+                    }
+                    string itemName = item.DisplayName.Replace("Item_", "").Replace("_Name", "").ToLower();
+                    string resourceName;
+                    if (ItemNameToResource.ItemToResource.ContainsKey(itemName))
+                    {
+                        resourceName = ItemNameToResource.ItemToResource[itemName];
+                    }
+                    else if (itemName.Contains("stowaway"))
+                    {
+                        resourceName = "stowaways";
+                    }
+                    else if (itemName.Contains("claw"))
+                    {
+                        resourceName = "junk";
+                    }
+                    else if (itemName.Contains("costume"))
+                    {
+                        resourceName = "costume";
+                    }
+                    else
+                    {
+                        resourceName = "junk";
+                    }
+                    Sprite sprite = ModHelper.GetSprite(resourceName);
+                    if (sprite == null)
+                    {
+                        continue;
+                    }
+                    itemMarkerCache.Add((item, sprite.texture));
                 }
             }
         }
