@@ -1,0 +1,11 @@
+<Project>
+  <!-- Copy this file to Directory.Build.props (gitignored) in the same folder and set
+       <ACT> to your own Another Crab's Treasure install path, e.g. a non-default Steam
+       Library drive. Directory.Build.props is imported automatically by MSBuild before
+       ACTAP.csproj is evaluated, so this overrides the default Steam path baked into
+       the committed .csproj. Only needed if your game isn't installed at the default
+       "C:\Program Files (x86)\Steam\steamapps\common\Another Crab's Treasure". -->
+  <PropertyGroup>
+    <ACT>D:\SteamLibrary\steamapps\common\Another Crab's Treasure</ACT>
+  </PropertyGroup>
+</Project>

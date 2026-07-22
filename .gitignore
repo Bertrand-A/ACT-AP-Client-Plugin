@@ -3,3 +3,6 @@
 .vs
 .idea/
 *.user
+/Directory.Build.props
+/Assembly-CSharp.dll
+/another_crab/

@@ -18,6 +18,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using AggroCrab.Enemies; // Nécessaire pour la classe Enemy
 
 namespace ACTAP
 {
@@ -97,6 +98,7 @@ namespace ACTAP
 
             //Debug on Scene Load
             SceneManager.sceneLoaded += DebugLogger;
+            EnemyRando.Initialize();
 
 
 
@@ -191,7 +193,6 @@ namespace ACTAP
             }
         }
 
-
         //DEBUG CONTROLS
         [HarmonyPatch(typeof(Player), "Update")]
         class PlayerPatch
@@ -277,8 +278,14 @@ namespace ACTAP
                         }
                     }
                 }
+                // F7 diagnostic works whenever active (debug OR connected), not only debug mode.
+                if (Input.GetKeyDown(KeyCode.F7) && _player != null)
+                {
+                    Debug.Log("F7 Pressed: dumping nearest enemy state");
+                    EnemyRando.DumpNearestEnemyState(_player.transform.position);
+                }
                 if (Input.GetKeyDown(KeyCode.Insert))
-                { 
+                {
                     showMenu = !showMenu;
                     Debug.Log("Toggle Menu");
                 }
@@ -749,8 +756,6 @@ namespace ACTAP
                 }
             }
 
-
-
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
             GUI.DragWindow();
@@ -816,7 +821,7 @@ namespace ACTAP
                     }
                 }
 
-                
+
                 GUILayout.EndVertical();
                 GUILayout.EndHorizontal();
                 
@@ -829,6 +834,7 @@ namespace ACTAP
         }
 
         //In game ui for debug mode
+
         void DebugMenu(int windowID)
         {
             if (debugMode == true && _player != null)
@@ -855,6 +861,8 @@ namespace ACTAP
                 markerRenderDistance = GUILayout.HorizontalSlider(markerRenderDistance, 100f, 1000f);
 
                 hideMarkersOnAggro = GUILayout.Toggle(hideMarkersOnAggro, "Hide markers in combat");
+                EnemyRando.debugEnabled = GUILayout.Toggle(EnemyRando.debugEnabled, "Enemy Rando");
+                EnemyRando.debugIncludeNgPlus = GUILayout.Toggle(EnemyRando.debugIncludeNgPlus, "  incl. NG+ enemies");
 
                 if (CrabFile.current.GetBool("showMapMarkers") != RenderMapMarkers)
                     CrabFile.current.SetBool("showMapMarkers", RenderMapMarkers);

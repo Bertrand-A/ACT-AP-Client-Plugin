@@ -1,7 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <ACT>D:\SteamLibrary\steamapps\common\Another Crab's Treasure</ACT>
+    <!-- Default Steam install location. Override locally (e.g. a custom Steam Library
+         drive) by creating a Directory.Build.props next to this file setting <ACT>
+         before this is evaluated - see Directory.Build.props.example. Do NOT edit the
+         default below to point at your own machine; that breaks the build for everyone
+         else who clones the repo. -->
+    <ACT Condition="'$(ACT)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Another Crab's Treasure</ACT>
     <BepinCore>$(ACT)\BepInEx\core</BepinCore>
     <Managed>$(ACT)\AnotherCrabsTreasure_Data\Managed</Managed>
     <OutputFolder>$(ACT)\BepInEx\plugins</OutputFolder>
@@ -55,9 +60,7 @@
     <Reference Include="$(BepinCore)\BepInEx.dll"></Reference>
     <Reference Include="$(Managed)\Unity.TextMeshPro.dll"></Reference>
     <Reference Include="$(Managed)\UnityEngine.UI.dll"></Reference>
-    <Reference Include="FMODUnity">
-      <HintPath>..\..\..\..\..\SteamLibrary\steamapps\common\Another Crab's Treasure\AnotherCrabsTreasure_Data\Managed\FMODUnity.dll</HintPath>
-    </Reference>
+    <Reference Include="$(Managed)\FMODUnity.dll"></Reference>
   </ItemGroup>
 
   <Target Name="MoveDllToMods" AfterTargets="Build" Condition="Exists('$(TargetDir)$(TargetName).dll')">

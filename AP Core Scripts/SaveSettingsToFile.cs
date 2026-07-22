@@ -61,12 +61,21 @@ namespace ACTAP
                 bool ngplusBosses = (bool)Plugin.connection.slotData["ngplus_bosses"];
                 bool ngplusSlots = (bool)Plugin.connection.slotData["ngplus_slots"];
 
+                //Enemy Randomizer (0 = off, 1 = on, 2 = on with NG+ pool)
+                //Read defensively: games generated before this option existed won't have the key.
+                int enemyRando = 0;
+                if (Plugin.connection.slotData.ContainsKey("enemy_rando"))
+                {
+                    enemyRando = (int)(long)Plugin.connection.slotData["enemy_rando"];
+                }
+
                 CrabFile.current.SetString("setting_microplasticMod", ((float)microplaticMod).ToString());
                 CrabFile.current.SetString("shellRando", shellRando);
                 CrabFile.current.SetBool("shellRandoEnabled", shellRandoEnabled);
                 CrabFile.current.SetInt("currentGoal",  (int)goal);
                 CrabFile.current.SetBool("ngplusBosses", ngplusBosses);
                 CrabFile.current.SetBool("ngplusSlots", ngplusSlots);
+                CrabFile.current.SetInt("enemyRando", enemyRando);
 
             }
         }
