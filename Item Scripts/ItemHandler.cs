@@ -61,6 +61,18 @@ namespace ACTAP
                         Plugin.GetConnection().SendCompletion();
                     }
 
+                    //If Goal is Petroch
+                    else if (apid - 483021700 == 58 && CrabFile.current.GetInt("currentGoal") == 4)
+                    {
+                        Plugin.GetConnection().SendCompletion();
+                    }
+
+                    //If Goal is Inkerton
+                    else if (apid - 483021700 == 59 && CrabFile.current.GetInt("currentGoal") == 5)
+                    {
+                        Plugin.GetConnection().SendCompletion();
+                    }
+
                     /*if (apid == 44)
                     {
                         Plugin.GetConnection().SendCompletion();
